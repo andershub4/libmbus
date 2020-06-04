@@ -629,6 +629,9 @@ const char *mbus_unit_prefix(int exp);
 
 const char *mbus_data_error_lookup(int error);
 
+const char *mbus_vib_unit_lookup_FB(mbus_value_information_block *vib);
+const char *mbus_vib_unit_lookup_FD(mbus_value_information_block *vib);
+
 const char *mbus_vib_unit_lookup(mbus_value_information_block *vib);
 const char *mbus_vif_unit_lookup(unsigned char vif);
 
