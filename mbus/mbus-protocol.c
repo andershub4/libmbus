@@ -2279,6 +2279,66 @@ mbus_vib_unit_lookup_FB(mbus_value_information_block *vib)
 }
 
 const char *
+mbus_unit_duration_nn(int nn)
+{
+    static char buff[256];
+
+    switch (nn)
+    {
+        case 0:
+            snprintf(buff, sizeof(buff), "second(s)");
+            break;
+
+        case 1:
+            snprintf(buff, sizeof(buff), "minute(s)");
+            break;
+
+        case 2:
+            snprintf(buff, sizeof(buff), "hour(s)");
+            break;
+
+        case 3:
+            snprintf(buff, sizeof(buff), "day(s)");
+            break;
+
+        default:
+            return "";
+    }
+
+    return buff;
+}
+
+const char *
+mbus_unit_duration_pp(int pp)
+{
+    static char buff[256];
+
+    switch (pp)
+    {
+        case 0:
+            snprintf(buff, sizeof(buff), "hour(s)");
+            break;
+
+        case 1:
+            snprintf(buff, sizeof(buff), "day(s)");
+            break;
+
+        case 2:
+            snprintf(buff, sizeof(buff), "month(s)");
+            break;
+
+        case 3:
+            snprintf(buff, sizeof(buff), "year(s)");
+            break;
+
+        default:
+            return "";
+    }
+
+    return buff;
+}
+
+const char *
 mbus_vib_unit_lookup_FD(mbus_value_information_block *vib)
 {
     static char buff[256];
@@ -2287,10 +2347,19 @@ mbus_vib_unit_lookup_FD(mbus_value_information_block *vib)
     // ignore the extension bit in this selection
     const unsigned char masked_vife0 = vib->vife[0] & MBUS_DIB_VIF_WITHOUT_EXTENSION; 
 
-    //E000 00nn	Credit of 10nn-3 of the nominal local legal currency units	Currency Units
-    //E000 01nn	Debit of 10nn-3 of the nominal local legal currency units
-
-    if (masked_vife0 == 0x08)
+    if ((masked_vife0 & 0x7C) == 0x00)
+    {
+        // VIFE = E000 00nn	Credit of 10nn-3 of the nominal local legal currency units
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Credit of %s of the nominal local legal currency units", mbus_unit_prefix(n - 3));
+    }
+    else if ((masked_vife0 & 0x7C) == 0x04)
+    {
+        // VIFE = E000 01nn Debit of 10nn-3 of the nominal local legal currency units
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Debit of %s of the nominal local legal currency units", mbus_unit_prefix(n - 3));
+    }
+    else if (masked_vife0 == 0x08)
     {
         // E000 1000
         snprintf(buff, sizeof(buff), "Access Number (transmission count)");
@@ -2340,12 +2409,26 @@ mbus_vib_unit_lookup_FD(mbus_value_information_block *vib)
         // VIFE = E001 0001 Customer
         snprintf(buff, sizeof(buff), "Customer");
     }
-
-//E001 0010	Access Code User	 
-//E001 0011	Access Code Operator	Implementation of all
-//E001 0100	Access Code System Operator	TC294 WG1 requirements
-//E001 0101	Access Code Developer	(improved selection ..)
-
+    else if (masked_vife0 == 0x12)
+    {
+        // VIFE = E001 0010	Access Code User
+        snprintf(buff, sizeof(buff), "Access Code User");
+    }
+    else if (masked_vife0 == 0x13)
+    {
+        // VIFE = E001 0011	Access Code Operator
+        snprintf(buff, sizeof(buff), "Access Code Operator");
+    }
+    else if (masked_vife0 == 0x14)
+    {
+        // VIFE = E001 0100	Access Code System Operator
+        snprintf(buff, sizeof(buff), "Access Code System Operator");
+    }
+    else if (masked_vife0 == 0x15)
+    {
+        // VIFE = E001 0101	Access Code Developer
+        snprintf(buff, sizeof(buff), "Access Code Developer");
+    }
     else if (masked_vife0 == 0x16)
     {
         // VIFE = E001 0110 Password
@@ -2356,10 +2439,16 @@ mbus_vib_unit_lookup_FD(mbus_value_information_block *vib)
         // VIFE = E001 0111 Error flags
         snprintf(buff, sizeof(buff), "Error flags");
     }
-
-//E001 1000	Error mask	 
-//E001 1001	Reserved
-
+    else if (masked_vife0 == 0x18)
+    {
+        // VIFE = E001 1000	Error mask
+        snprintf(buff, sizeof(buff), "Error mask");
+    }
+    else if (masked_vife0 == 0x19)
+    {
+        // VIFE = E001 1001	Reserved
+        snprintf(buff, sizeof(buff), "Reserved");
+    }
     else if (masked_vife0 == 0x1A)
     {
         // VIFE = E001 1010 Digital output (binary)
@@ -2370,31 +2459,120 @@ mbus_vib_unit_lookup_FD(mbus_value_information_block *vib)
         // VIFE = E001 1011 Digital input (binary)
         snprintf(buff, sizeof(buff), "Digital input (binary)");
     }
-
-//E001 1100	Baudrate [Baud]	 
-//E001 1101	response delay time [bittimes]	 
-//E001 1110	Retry	 
-//E001 1111	Reserved
-
-//E010 0000	First storage # for cyclic storage	 
-//E010 0001	Last storage # for cyclic storage	 
-//E010 0010	Size of storage block	 
-//E010 0011	Reserved	 
-//E010 01nn	Storage interval [sec(s)..day(s)] ¹ a	Enhanced storage
-//E010 1000	Storage interval month(s)	management
-//E010 1001	Storage interval year(s)	 
-//E010 1010	Reserved	 
-//E010 1011	Reserved	 
-//E010 11nn	Duration since last readout [sec(s)..day(s)] ¹	 
-//E011 0000	Start (date/time) of tariff ²	 
-//E011 00nn	Duration of tariff (nn=01 ..11: min to days)	 
-//E011 01nn	Period of tariff [sec(s) to day(s)] ¹	 
-//E011 1000	Period of tariff months(s)	Enhanced tariff
-//E011 1001	Period of tariff year(s)	management
-//E011 1010	dimensionless / no VIF	 
-//E011 1011	Reserved	 
-//E011 11xx	Reserved //?????????????????????
-
+    else if (masked_vife0 == 0x1C)
+    {
+        // VIFE = E001 1100	Baudrate [Baud]
+        snprintf(buff, sizeof(buff), "Baudrate");
+    }
+    else if (masked_vife0 == 0x1D)
+    {
+        // VIFE = E001 1101	response delay time [bittimes]
+        snprintf(buff, sizeof(buff), "response delay time");
+    }
+    else if (masked_vife0 == 0x1E)
+    {
+        // VIFE = E001 1110	Retry
+        snprintf(buff, sizeof(buff), "Retry");
+    }
+    else if (masked_vife0 == 0x1F)
+    {
+        // VIFE = E001 1111	Reserved
+        snprintf(buff, sizeof(buff), "Reserved");
+    }
+    else if (masked_vife0 == 0x20)
+    {
+        // VIFE = E010 0000	First storage # for cyclic storage
+        snprintf(buff, sizeof(buff), "First storage # for cyclic storage");
+    }
+    else if (masked_vife0 == 0x21)
+    {
+        // VIFE = E010 0001	Last storage # for cyclic storage
+        snprintf(buff, sizeof(buff), "Last storage # for cyclic storage");
+    }
+    else if (masked_vife0 == 0x22)
+    {
+        // VIFE = E010 0010	Size of storage block
+        snprintf(buff, sizeof(buff), "Size of storage block");
+    }
+    else if (masked_vife0 == 0x23)
+    {
+        // VIFE = E010 0011	Reserved
+        snprintf(buff, sizeof(buff), "Reserved");
+    }
+    else if ((masked_vife0 & 0x7C) == 0x24)
+    {
+        // VIFE = E010 01nn	Storage interval [sec(s)..day(s)]
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Storage interval %s", mbus_unit_duration_nn(n));
+    }
+    else if (masked_vife0 == 0x28)
+    {
+        // VIFE = E010 1000	Storage interval month(s)
+        snprintf(buff, sizeof(buff), "Storage interval month(s)");
+    }
+    else if (masked_vife0 == 0x29)
+    {
+        // VIFE = E010 1001	Storage interval year(s)
+        snprintf(buff, sizeof(buff), "Storage interval year(s)");
+    }
+    else if (masked_vife0 == 0x2A)
+    {
+        // VIFE = E010 1010	Reserved
+        snprintf(buff, sizeof(buff), "Reserved");
+    }
+    else if (masked_vife0 == 0x2B)
+    {
+        // VIFE = E010 1011	Reserved
+        snprintf(buff, sizeof(buff), "Reserved");
+    }
+    else if ((masked_vife0 & 0x7C) == 0x2C)
+    {
+        // VIFE = E010 11nn	Duration since last readout [sec(s)..day(s)]
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Duration since last readout %s", mbus_unit_duration_nn(n));
+    }
+    else if (masked_vife0 == 0x30)
+    {
+        // VIFE = E011 0000	Start (date/time) of tariff
+        snprintf(buff, sizeof(buff), "Start (date/time) of tariff");
+    }
+    else if ((masked_vife0 & 0x7C) == 0x30)
+    {
+        // VIFE = E011 00nn	Duration of tariff (nn=01 ..11: min to days)
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Duration of tariff %s", mbus_unit_duration_nn(n));
+    }
+    else if ((masked_vife0 & 0x7C) == 0x34)
+    {
+        // VIFE = E011 01nn	Period of tariff [sec(s) to day(s)]
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Period of tariff %s", mbus_unit_duration_nn(n));
+    }
+    else if (masked_vife0 == 0x38)
+    {
+        // VIFE = E011 1000	Period of tariff months(s)
+        snprintf(buff, sizeof(buff), "Period of tariff months(s)");
+    }
+    else if (masked_vife0 == 0x39)
+    {
+        // VIFE = E011 1001	Period of tariff year(s)
+        snprintf(buff, sizeof(buff), "Period of tariff year(s)");
+    }
+    else if (masked_vife0 == 0x3A)
+    {
+        // VIFE = E011 1010	dimensionless / no VIF
+        snprintf(buff, sizeof(buff), "dimensionless / no VIF");
+    }
+    else if (masked_vife0 == 0x3B)
+    {
+        // VIFE = E011 1011	Reserved
+        snprintf(buff, sizeof(buff), "Reserved");
+    }
+    else if ((masked_vife0 & 0x7C) == 0x3C)
+    {
+        // VIFE = E011 11xx	Reserved
+        snprintf(buff, sizeof(buff), "Reserved");
+    }
     else if ((masked_vife0 & 0x70) == 0x40)
     {
         // VIFE = E100 nnnn 10^(nnnn-9) V
@@ -2407,40 +2585,52 @@ mbus_vib_unit_lookup_FD(mbus_value_information_block *vib)
         n = (masked_vife0 & 0x0F);
         snprintf(buff, sizeof(buff), "%s A", mbus_unit_prefix(n - 12));
     }
-    else if (masked_vife0 == 0x70) {
+    else if (masked_vife0 == 0x60) {
         // VIFE = E110 0000	Reset counter
         snprintf(buff, sizeof(buff), "Reset counter");
     }
-    else if (masked_vife0 == 0x71) {
+    else if (masked_vife0 == 0x61) {
         // VIFE = E110 0001	Cumulation counter
         snprintf(buff, sizeof(buff), "Cumulation counter");
     }
-    else if (masked_vife0 == 0x72) {
+    else if (masked_vife0 == 0x62) {
         // VIFE = E110 0010	Control signal
         snprintf(buff, sizeof(buff), "Control signal");
     }
-    else if (masked_vife0 == 0x73) {
+    else if (masked_vife0 == 0x63) {
         // VIFE = E110 0011	Day of week
         snprintf(buff, sizeof(buff), "Day of week");
     }
-    else if (masked_vife0 == 0x74) {
+    else if (masked_vife0 == 0x64) {
         // VIFE = E110 0100	Week number
         snprintf(buff, sizeof(buff), "Week number");
     }
-    
-
-//-E110 0000	Reset counter	 
-//-E110 0001	Cumulation counter	 
-//-E110 0010	Control signal	 
-//-E110 0011	Day of week	 
-//-E110 0100	Week number	 
-//E110 0101	Time point of day change	 
-//E110 0110	State of parameter activation	 
-//E110 0111	Special supplier information	 
-//E110 10pp	Duration since last cumulation [hour(s)..years(s)]Ž	 
-//E110 11pp	Operating time battery [hour(s)..years(s)]Ž	 
-//E111 0000	Date and time of battery change //????????????
-
+    else if (masked_vife0 == 0x65) {
+        // VIFE = E110 0101	Time point of day change
+        snprintf(buff, sizeof(buff), "Time point of day change");
+    }
+    else if (masked_vife0 == 0x66) {
+        // VIFE = E110 0110	State of parameter activation
+        snprintf(buff, sizeof(buff), "State of parameter activation");
+    }
+    else if (masked_vife0 == 0x67) {
+        // VIFE = E110 0111	Special supplier information
+        snprintf(buff, sizeof(buff), "Special supplier information");
+    }
+    else if ((masked_vife0 & 0x7C) == 0x68) {
+        // VIFE = E110 10pp	Duration since last cumulation [hour(s)..years(s)]Ž
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Duration since last cumulation %s", mbus_unit_duration_pp(n));
+    }
+    else if ((masked_vife0 & 0x7C) == 0x6C) {
+        // VIFE = E110 11pp	Operating time battery [hour(s)..years(s)]Ž
+        n = (masked_vife0 & 0x03);
+        snprintf(buff, sizeof(buff), "Operating time battery %s", mbus_unit_duration_pp(n));
+    }
+    else if (masked_vife0 == 0x70) {
+        // VIFE = E111 0000	Date and time of battery change
+        snprintf(buff, sizeof(buff), "Date and time of battery change");
+    }
     else if ((masked_vife0 & 0x70) == 0x70)
     {
         // VIFE = E111 nnn Reserved
